@@ -7,6 +7,7 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/metrics_hashes.h"
 #include "chrome/browser/devtools/protocol/browser_handler_android.h"
+#include "chrome/browser/devtools/protocol/page_handler.h"
 #include "chrome/browser/devtools/protocol/target_handler_android.h"
 #include "content/public/browser/devtools_agent_host_client_channel.h"
 
@@ -14,7 +15,8 @@ namespace {
 
 template <typename Handler>
 bool IsDomainAvailableToUntrustedClient() {
-  return std::disjunction_v<std::is_same<Handler, TargetHandlerAndroid>>;
+  return std::disjunction_v<std::is_same<Handler, PageHandler>,
+                            std::is_same<Handler, TargetHandlerAndroid>>;
 }
 
 }  // namespace
@@ -23,6 +25,15 @@ ChromeDevToolsSessionAndroid::ChromeDevToolsSessionAndroid(
     content::DevToolsAgentHostClientChannel* channel)
     : dispatcher_(this), client_channel_(channel) {
   content::DevToolsAgentHost* agent_host = channel->GetAgentHost();
+  if (agent_host->GetWebContents() &&
+      agent_host->GetType() == content::DevToolsAgentHost::kTypePage) {
+    if (IsDomainAvailableToUntrustedClient<PageHandler>() ||
+        channel->GetClient()->IsTrusted()) {
+      page_handler_ = std::make_unique<PageHandler>(
+          agent_host, agent_host->GetWebContents(), &dispatcher_,
+          channel->GetClient()->IsTrusted());
+    }
+  }
   if (IsDomainAvailableToUntrustedClient<BrowserHandlerAndroid>() ||
       channel->GetClient()->IsTrusted()) {
     browser_handler_ = std::make_unique<BrowserHandlerAndroid>(

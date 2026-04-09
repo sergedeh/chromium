@@ -14,6 +14,7 @@
 #include "base/strings/string_util.h"
 #include "base/test/values_test_util.h"
 #include "base/values.h"
+#include "build/build_config.h"
 #include "chrome/browser/devtools/protocol/devtools_protocol_test_support.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/headless/test/pdf_utils.h"
@@ -148,9 +149,15 @@ class PrintToPdfProtocolTest : public DevToolsProtocolTest,
   headless::PDFPageBitmap page_bitmap_;
 };
 
+#if BUILDFLAG(IS_ANDROID)
+INSTANTIATE_TEST_SUITE_P(HeadfulOnly,
+                         PrintToPdfProtocolTest,
+                         testing::Values(false));
+#else
 INSTANTIATE_TEST_SUITE_P(HeadfulOrHeadless,
                          PrintToPdfProtocolTest,
                          testing::Bool());
+#endif
 
 IN_PROC_BROWSER_TEST_P(PrintToPdfProtocolTest, PrintToPdfBackground) {
   NavigateToURLBlockUntilNavigationsComplete("/print_to_pdf/basic.html");

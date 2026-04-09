@@ -18,6 +18,7 @@ class DevToolsAgentHostClientChannel;
 }  // namespace content
 
 class BrowserHandlerAndroid;
+class PageHandler;
 class TargetHandlerAndroid;
 
 class ChromeDevToolsSessionAndroid : public protocol::FrontendChannel {
@@ -54,6 +55,7 @@ class ChromeDevToolsSessionAndroid : public protocol::FrontendChannel {
 
   protocol::UberDispatcher dispatcher_;
   std::unique_ptr<BrowserHandlerAndroid> browser_handler_;
+  std::unique_ptr<PageHandler> page_handler_;
   std::unique_ptr<TargetHandlerAndroid> target_handler_;
   raw_ptr<content::DevToolsAgentHostClientChannel> client_channel_;
 };
