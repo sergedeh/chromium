@@ -9,7 +9,6 @@
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/custom_handlers/protocol_handler_registry_factory.h"
-#include "chrome/browser/web_applications/web_app_helpers.h"
 #include "components/custom_handlers/protocol_handler_registry.h"
 #include "components/payments/content/payment_request_web_contents_manager.h"
 #include "components/subresource_filter/content/browser/devtools_interaction_tracker.h"
@@ -334,8 +333,7 @@ void PageHandler::OnDidGetManifest(std::unique_ptr<GetAppIdCallback> callback,
     CHECK(data.manifest->start_url.is_valid());
     current_app_id_str = data.manifest->id.spec();
     recommended_manifest_id_path_only =
-        web_app::GenerateManifestIdFromStartUrlOnly(data.manifest->start_url)
-            .PathForRequest();
+        data.manifest->start_url.GetWithoutRef().PathForRequest();
   } else {
     CHECK(!data.manifest->start_url.is_valid());
   }
