@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 
@@ -132,6 +133,12 @@ using testing::Eq;
 using testing::Not;
 
 namespace {
+
+bool ListContainsString(const base::ListValue& list, std::string_view value) {
+  return std::ranges::any_of(list, [value](const base::Value& entry) {
+    return entry.is_string() && entry.GetString() == value;
+  });
+}
 
 #if !BUILDFLAG(IS_ANDROID)
 IN_PROC_BROWSER_TEST_F(DevToolsProtocolTest,
@@ -546,6 +553,55 @@ IN_PROC_BROWSER_TEST_F(DevToolsProtocolTest, MAYBE_AutoAttachToUnloadedTab) {
 }
 
 #endif  // !BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+IN_PROC_BROWSER_TEST_F(DevToolsProtocolTest, CreateListDisposeBrowserContext) {
+  AttachToBrowserTarget();
+
+  const base::DictValue* result =
+      SendCommandSync("Target.createBrowserContext");
+  ASSERT_TRUE(result);
+  const std::string first_context_id =
+      *result->FindString("browserContextId");
+
+  result = SendCommandSync("Target.createBrowserContext");
+  ASSERT_TRUE(result);
+  const std::string second_context_id =
+      *result->FindString("browserContextId");
+  EXPECT_NE(first_context_id, second_context_id);
+
+  result = SendCommandSync("Target.getBrowserContexts");
+  ASSERT_TRUE(result);
+  const base::ListValue* browser_context_ids =
+      result->FindList("browserContextIds");
+  ASSERT_TRUE(browser_context_ids);
+  EXPECT_TRUE(ListContainsString(*browser_context_ids, first_context_id));
+  EXPECT_TRUE(ListContainsString(*browser_context_ids, second_context_id));
+  EXPECT_TRUE(result->FindString("defaultBrowserContextId"));
+
+  base::DictValue params;
+  params.Set("browserContextId", first_context_id);
+  SendCommandSync("Target.disposeBrowserContext", std::move(params));
+
+  result = SendCommandSync("Target.getBrowserContexts");
+  ASSERT_TRUE(result);
+  browser_context_ids = result->FindList("browserContextIds");
+  ASSERT_TRUE(browser_context_ids);
+  EXPECT_FALSE(ListContainsString(*browser_context_ids, first_context_id));
+  EXPECT_TRUE(ListContainsString(*browser_context_ids, second_context_id));
+
+  params = base::DictValue();
+  params.Set("browserContextId", second_context_id);
+  SendCommandSync("Target.disposeBrowserContext", std::move(params));
+
+  result = SendCommandSync("Target.getBrowserContexts");
+  ASSERT_TRUE(result);
+  browser_context_ids = result->FindList("browserContextIds");
+  ASSERT_TRUE(browser_context_ids);
+  EXPECT_FALSE(ListContainsString(*browser_context_ids, first_context_id));
+  EXPECT_FALSE(ListContainsString(*browser_context_ids, second_context_id));
+}
+#endif  // BUILDFLAG(IS_ANDROID)
 
 IN_PROC_BROWSER_TEST_F(DevToolsProtocolTest,
                        NoInputEventsSentToBrowserWhenDisallowed) {

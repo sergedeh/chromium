@@ -10,12 +10,10 @@
 #include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/profiles/profile_destroyer.h"
 #include "chrome/browser/profiles/profile_manager.h"
-#include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/browser_finder.h"
-#include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+#include "ui/base/base_window.h"
 
 namespace {
 
@@ -126,7 +124,13 @@ void DevToolsBrowserContextManager::DisposeBrowserContext(
   }
 
   pending_context_disposals_[context_id] = std::move(callback);
-  chrome::CloseAllBrowsersWithIncognitoProfile(profile);
+  ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+      [profile](BrowserWindowInterface* browser_window_interface) {
+        if (browser_window_interface->GetProfile() == profile) {
+          browser_window_interface->GetWindow()->Close();
+        }
+        return true;
+      });
 }
 
 void DevToolsBrowserContextManager::OnProfileWillBeDestroyed(Profile* profile) {
