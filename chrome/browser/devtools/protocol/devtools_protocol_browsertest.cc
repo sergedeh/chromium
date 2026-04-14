@@ -555,6 +555,49 @@ IN_PROC_BROWSER_TEST_F(DevToolsProtocolTest, MAYBE_AutoAttachToUnloadedTab) {
 #endif  // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
+IN_PROC_BROWSER_TEST_F(DevToolsProtocolTest,
+                       CreateTargetUsesRequestedBrowserContext) {
+  AttachToBrowserTarget();
+
+  const base::DictValue* result =
+      SendCommandSync("Target.createBrowserContext");
+  ASSERT_TRUE(result);
+  const std::string context_id =
+      *result->FindString("browserContextId");
+
+  base::DictValue params;
+  params.Set("url", "about:blank");
+  params.Set("browserContextId", context_id);
+  result = SendCommandSync("Target.createTarget", std::move(params));
+  ASSERT_TRUE(result);
+  const std::string target_id = *result->FindString("targetId");
+
+  scoped_refptr<content::DevToolsAgentHost> agent_host =
+      content::DevToolsAgentHost::GetForId(target_id);
+  ASSERT_TRUE(agent_host);
+  content::WebContents* web_contents = agent_host->GetWebContents();
+  ASSERT_TRUE(web_contents);
+  EXPECT_EQ(context_id, web_contents->GetBrowserContext()->UniqueId());
+
+  result = SendCommandSync("Target.getTargets");
+  ASSERT_TRUE(result);
+  const base::ListValue* target_infos = result->FindList("targetInfos");
+  ASSERT_TRUE(target_infos);
+
+  const base::Value* created_target_info = nullptr;
+  for (const auto& target : *target_infos) {
+    const std::string* listed_target_id = target.GetDict().FindString("targetId");
+    if (listed_target_id && *listed_target_id == target_id) {
+      created_target_info = &target;
+      break;
+    }
+  }
+
+  ASSERT_TRUE(created_target_info);
+  EXPECT_EQ(context_id,
+            *created_target_info->GetDict().FindString("browserContextId"));
+}
+
 IN_PROC_BROWSER_TEST_F(DevToolsProtocolTest, CreateListDisposeBrowserContext) {
   AttachToBrowserTarget();
 

@@ -5,11 +5,83 @@
 #include "chrome/browser/devtools/protocol/target_handler_android.h"
 
 #include "chrome/browser/android/devtools_manager_delegate_android.h"
+#include "chrome/browser/devtools/devtools_browser_context_manager.h"
+#include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/android/tab_model/tab_model.h"
 #include "chrome/browser/ui/android/tab_model/tab_model_list.h"
+#include "components/tabs/public/tab_interface.h"
+#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/web_contents.h"
 
 using content::WebContents;
+
+namespace {
+
+Profile* GetProfileForBrowserContext(
+    const std::optional<std::string>& browser_context_id) {
+  if (browser_context_id.has_value()) {
+    return DevToolsBrowserContextManager::GetInstance().GetProfileById(
+        *browser_context_id);
+  }
+
+  Profile* profile = ProfileManager::GetLastUsedProfileIfLoaded();
+  return profile ? profile->GetOriginalProfile() : nullptr;
+}
+
+TabModel* FindTabModelForProfile(Profile* profile) {
+  if (!profile) {
+    return nullptr;
+  }
+
+  for (TabModel* model : TabModelList::models()) {
+    if (model->GetProfile() == profile &&
+        model->GetTabModelType() == TabModel::TabModelType::kStandard) {
+      return model;
+    }
+  }
+
+  return nullptr;
+}
+
+TabModel* FindAnyStandardTabModel() {
+  for (TabModel* model : TabModelList::models()) {
+    if (model->GetTabModelType() == TabModel::TabModelType::kStandard) {
+      return model;
+    }
+  }
+
+  return nullptr;
+}
+
+WebContents* CreateTabInProfile(TabModel* tab_model,
+                                Profile* profile,
+                                const GURL& url) {
+  if (!tab_model || !profile) {
+    return nullptr;
+  }
+
+  content::WebContents::CreateParams create_params(profile);
+  std::unique_ptr<content::WebContents> web_contents =
+      content::WebContents::Create(create_params);
+  if (!web_contents) {
+    return nullptr;
+  }
+
+  tabs::TabInterface* new_tab = tab_model->CreateTab(
+      /*parent=*/nullptr, std::move(web_contents), /*index=*/-1,
+      TabModel::TabLaunchType::FROM_CHROME_UI, /*should_pin=*/false);
+  if (!new_tab || !new_tab->GetContents()) {
+    return nullptr;
+  }
+
+  WebContents* created_web_contents = new_tab->GetContents();
+  content::NavigationController::LoadURLParams load_url_params(url);
+  created_web_contents->GetController().LoadURLWithParams(load_url_params);
+  return created_web_contents;
+}
+
+}  // namespace
 
 TargetHandlerAndroid::TargetHandlerAndroid(protocol::UberDispatcher* dispatcher,
                                            bool is_trusted,
@@ -50,16 +122,28 @@ protocol::Response TargetHandlerAndroid::CreateTarget(
     std::optional<bool> hidden,
     std::optional<bool> focus,
     std::string* out_target_id) {
-  const TabModelList::TabModelVector& models = TabModelList::models();
-  if (models.empty()) {
-    return protocol::Response::ServerError("Could not find TabModelList");
+  Profile* profile = GetProfileForBrowserContext(browser_context_id);
+  if (!profile) {
+    if (browser_context_id.has_value()) {
+      return protocol::Response::ServerError(
+          "Failed to find browser context with id " + *browser_context_id);
+    }
+    return protocol::Response::ServerError(
+        "Could not find default browser context");
   }
 
-  TabModel* tab_model = models[0];
-  CHECK(tab_model);
+  TabModel* tab_model = FindTabModelForProfile(profile);
+  if (!tab_model) {
+    tab_model = FindAnyStandardTabModel();
+  }
 
-  WebContents* web_contents =
-      tab_model->CreateNewTabForDevTools(GURL(url), new_window.value_or(false));
+  WebContents* web_contents = nullptr;
+  if (tab_model && !browser_context_id.has_value()) {
+    web_contents = tab_model->CreateNewTabForDevTools(
+        GURL(url), new_window.value_or(false));
+  } else {
+    web_contents = CreateTabInProfile(tab_model, profile, GURL(url));
+  }
   if (!web_contents) {
     return protocol::Response::ServerError("Could not create a Tab");
   }
