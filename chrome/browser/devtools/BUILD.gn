@@ -234,6 +234,8 @@ static_library("devtools") {
     sources += [
       "chrome_devtools_session_android.cc",
       "chrome_devtools_session_android.h",
+      "devtools_browser_context_manager.cc",
+      "devtools_browser_context_manager.h",
       "devtools_window_android.cc",
       "protocol/browser_handler_android.cc",
       "protocol/browser_handler_android.h",
@@ -241,7 +243,10 @@ static_library("devtools") {
       "protocol/target_handler_android.h",
     ]
 
-    deps += [ "//chrome/browser/ui/android/tab_model" ]
+    deps += [
+      "//chrome/browser/ui/android/tab_model",
+      "//chrome/browser/ui/browser_window",
+    ]
   } else {
     public_deps += [
       "//chrome/browser/ui:browser_tab_strip",
@@ -330,8 +335,6 @@ static_library("devtools") {
       "device/usb/usb_device_provider.h",
       "devtools_auto_opener.cc",
       "devtools_auto_opener.h",
-      "devtools_browser_context_manager.cc",
-      "devtools_browser_context_manager.h",
       "devtools_connection_dialog.cc",
       "devtools_connection_dialog.h",
       "devtools_dock_tile.h",
