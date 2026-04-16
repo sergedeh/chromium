@@ -821,21 +821,21 @@
     }
     function getProxyStr(proxyConfig) {
         if (proxyConfig.proxyType === 'direct' ||
-            proxyConfig.proxyType === 'system') {
+            proxyConfig.proxyType === 'system' ||
+            proxyConfig.proxyType === 'autodetect') {
             return undefined;
         }
         if (proxyConfig.proxyType === 'pac') {
             throw new UnsupportedOperationException(`PAC proxy configuration is not supported per user context`);
         }
-        if (proxyConfig.proxyType === 'autodetect') {
-            throw new UnsupportedOperationException(`Autodetect proxy is not supported per user context`);
-        }
         if (proxyConfig.proxyType === 'manual') {
             const servers = [];
             if (proxyConfig.httpProxy !== undefined) {
+                validateManualProxyEndpoint(proxyConfig.httpProxy, 'httpProxy');
                 servers.push(`http=${proxyConfig.httpProxy}`);
             }
             if (proxyConfig.sslProxy !== undefined) {
+                validateManualProxyEndpoint(proxyConfig.sslProxy, 'sslProxy');
                 servers.push(`https=${proxyConfig.sslProxy}`);
             }
             if (proxyConfig.socksProxy !== undefined ||
@@ -843,6 +843,7 @@
                 if (proxyConfig.socksProxy === undefined) {
                     throw new InvalidArgumentException(`'socksVersion' cannot be set without 'socksProxy'`);
                 }
+                validateManualProxyEndpoint(proxyConfig.socksProxy, 'socksProxy');
                 if (proxyConfig.socksVersion === undefined ||
                     typeof proxyConfig.socksVersion !== 'number' ||
                     !Number.isInteger(proxyConfig.socksVersion) ||
@@ -858,6 +859,28 @@
             return servers.join(';');
         }
         throw new UnknownErrorException(`Unknown proxy type`);
+    }
+    function validateManualProxyEndpoint(proxyValue, parameterName) {
+        if (typeof proxyValue !== 'string') {
+            throw new InvalidArgumentException(`'${parameterName}' must be a string`);
+        }
+        if (proxyValue.includes('://') ||
+            proxyValue.includes('/') ||
+            proxyValue.includes('?') ||
+            proxyValue.includes('#')) {
+            throw new InvalidArgumentException(`'${parameterName}' must be a host or host:port without a scheme, path, query, or fragment`);
+        }
+        try {
+            const parsedProxy = new URL(`http://${proxyValue}`);
+            if (parsedProxy.hostname === '' ||
+                parsedProxy.username !== '' ||
+                parsedProxy.password !== '') {
+                throw new Error('Invalid proxy endpoint');
+            }
+        }
+        catch {
+            throw new InvalidArgumentException(`'${parameterName}' must be a valid host or host:port`);
+        }
     }
 
     /**
