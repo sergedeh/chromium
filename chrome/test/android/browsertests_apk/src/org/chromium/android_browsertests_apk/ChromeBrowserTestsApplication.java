@@ -17,6 +17,16 @@ import org.chromium.ui.base.ResourceBundle;
 /** A basic chrome.browser.tests {@link android.app.Application}. */
 public class ChromeBrowserTestsApplication extends NativeBrowserTestApplication {
     static final String PRIVATE_DATA_DIRECTORY_SUFFIX = "android_browsertests";
+    // Matches the packaged Chrome locale paks used by Android browser tests.
+    private static final String[] AVAILABLE_LOCALES = {
+        "af", "am", "ar", "ar-XB", "as", "az", "be", "bg", "bn", "bs", "ca", "cs", "da", "de",
+        "el", "en-GB", "en-US", "en-XA", "es", "es-419", "et", "eu", "fa", "fi", "fil", "fr",
+        "fr-CA", "gl", "gu", "he", "hi", "hr", "hu", "hy", "id", "is", "it", "ja", "ka", "kk",
+        "km", "kn", "ko", "ky", "lo", "lt", "lv", "mk", "ml", "mn", "mr", "ms", "my", "nb",
+        "ne", "nl", "or", "pa", "pl", "pt-BR", "pt-PT", "ro", "ru", "si", "sk", "sl", "sq",
+        "sr", "sr-Latn", "sv", "sw", "ta", "te", "th", "tr", "uk", "ur", "uz", "vi", "zh-CN",
+        "zh-HK", "zh-TW", "zu"
+    };
 
     @Override
     protected void attachBaseContext(Context base) {
@@ -33,9 +43,7 @@ public class ChromeBrowserTestsApplication extends NativeBrowserTestApplication 
         if (isBrowserProcess) {
             // Test-only stuff, see also NativeUnitTest.java.
             PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX);
-            // ResourceBundle asserts that locale paks have been given to it.
-            // In test targets there is no list of paks generated.
-            ResourceBundle.setNoAvailableLocalePaks();
+            ResourceBundle.setAvailablePakLocales(AVAILABLE_LOCALES);
             // Some browser tests trigger access to ContextualNotificationPermissionRequester. It
             // is normally initialized as part of Chrome startup.
             // TODO(crbug.com/454692653): This class should share more code with the production
