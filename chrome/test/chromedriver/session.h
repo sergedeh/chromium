@@ -74,6 +74,17 @@ struct BidiConnection {
   CloseFunc close_connection;
 };
 
+struct AndroidDownloadPathMapping {
+  AndroidDownloadPathMapping(std::string host_download_path,
+                             std::string device_download_path);
+  AndroidDownloadPathMapping(AndroidDownloadPathMapping&& other);
+  ~AndroidDownloadPathMapping();
+  AndroidDownloadPathMapping& operator=(AndroidDownloadPathMapping&& other);
+
+  std::string host_download_path;
+  std::string device_download_path;
+};
+
 struct Session {
   static const base::TimeDelta kDefaultImplicitWaitTimeout;
   static const base::TimeDelta kDefaultPageLoadTimeout;
@@ -101,6 +112,7 @@ struct Session {
   void AddBidiConnection(int connection_id,
                          SendTextFunc send_response,
                          CloseFunc close_connection);
+  std::string RegisterAndroidDownloadPath(const std::string& host_download_path);
   void RemoveBidiConnection(int connection_id);
   void CloseAllConnections();
   static void Terminate();
@@ -162,8 +174,11 @@ struct Session {
 
  private:
   void SwitchFrameInternal(bool for_top_frame);
+  void RewriteAndroidDownloadPathInBidiResponse(base::DictValue* payload) const;
 
   std::vector<BidiConnection> bidi_connections_;
+  int next_android_download_path_id_ = 0;
+  std::vector<AndroidDownloadPathMapping> android_download_path_mappings_;
 };
 
 Session* GetThreadLocalSession();

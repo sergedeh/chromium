@@ -1915,6 +1915,7 @@ if (is_android) {
     }
 
     sources = [
+      "../browser/devtools/protocol/devtools_protocol_android_browsertest.cc",
       "../browser/android/cookies/cookies_fetcher_restore_util_browsertest.cc",
       "../browser/android/customtabs/custom_tabs_browsertest.cc",
       "../browser/android/customtabs/tab_interaction_recorder_browsertest.cc",
