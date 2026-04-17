@@ -15,6 +15,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/values.h"
+#include "chrome/test/chromedriver/chrome/browser_info.h"
 #include "chrome/test/chromedriver/chrome/chrome.h"
 #include "chrome/test/chromedriver/chrome/devtools_client.h"
 #include "chrome/test/chromedriver/chrome/status.h"
@@ -26,7 +27,33 @@ namespace {
 
 constinit thread_local Session* session = nullptr;
 
+bool MatchesAndroidDownloadPathPrefix(const std::string& filepath,
+                                      const std::string& device_download_path) {
+  if (filepath == device_download_path) {
+    return true;
+  }
+
+  return filepath.size() > device_download_path.size() &&
+         base::StartsWith(filepath, device_download_path,
+                          base::CompareCase::SENSITIVE) &&
+         filepath[device_download_path.size()] == '/';
+}
+
 }  // namespace
+
+AndroidDownloadPathMapping::AndroidDownloadPathMapping(
+    std::string host_download_path,
+    std::string device_download_path)
+    : host_download_path(std::move(host_download_path)),
+      device_download_path(std::move(device_download_path)) {}
+
+AndroidDownloadPathMapping::AndroidDownloadPathMapping(
+    AndroidDownloadPathMapping&& other) = default;
+
+AndroidDownloadPathMapping::~AndroidDownloadPathMapping() = default;
+
+AndroidDownloadPathMapping& AndroidDownloadPathMapping::operator=(
+    AndroidDownloadPathMapping&& other) = default;
 
 namespace internal {
 
@@ -235,6 +262,8 @@ Status Session::OnBidiResponse(base::DictValue payload) {
                   "unexpected channel name in the BiDi response"};
   }
 
+  RewriteAndroidDownloadPathInBidiResponse(&payload);
+
   std::string message;
   // `OPTIONS_OMIT_DOUBLE_TYPE_PRESERVATION` is needed to keep the BiDi format.
   // crbug.com/chromedriver/4297.
@@ -265,6 +294,25 @@ void Session::AddBidiConnection(int connection_id,
                                  std::move(close_connection));
 }
 
+std::string Session::RegisterAndroidDownloadPath(
+    const std::string& host_download_path) {
+  const BrowserInfo* browser_info = chrome ? chrome->GetBrowserInfo() : nullptr;
+  if (!browser_info || !browser_info->is_android ||
+      browser_info->android_package.empty()) {
+    return host_download_path;
+  }
+
+  ++next_android_download_path_id_;
+  std::string device_download_path = "/data/user/0/" +
+                                     browser_info->android_package +
+                                     "/cache/chromedriver-downloads/" +
+                                     base::NumberToString(
+                                         next_android_download_path_id_);
+  android_download_path_mappings_.emplace_back(host_download_path,
+                                               device_download_path);
+  return device_download_path;
+}
+
 void Session::RemoveBidiConnection(int connection_id) {
   // As connections can be closed by both remote and local ends
   // we don't treat an attempt to close a non-existing (presumably closed)
@@ -275,6 +323,30 @@ void Session::RemoveBidiConnection(int connection_id) {
                               &BidiConnection::connection_id);
   if (it != bidi_connections_.end()) {
     bidi_connections_.erase(it);
+  }
+}
+
+void Session::RewriteAndroidDownloadPathInBidiResponse(
+    base::DictValue* payload) const {
+  const std::string* method = payload->FindString("method");
+  if (!method || *method != "browsingContext.downloadEnd") {
+    return;
+  }
+
+  std::string* filepath = payload->FindStringByDottedPath("params.filepath");
+  if (!filepath) {
+    return;
+  }
+
+  for (const auto& mapping : android_download_path_mappings_) {
+    if (!MatchesAndroidDownloadPathPrefix(*filepath,
+                                          mapping.device_download_path)) {
+      continue;
+    }
+
+    *filepath = mapping.host_download_path +
+                filepath->substr(mapping.device_download_path.size());
+    return;
   }
 }
 

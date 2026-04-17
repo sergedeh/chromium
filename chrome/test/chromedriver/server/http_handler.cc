@@ -1920,6 +1920,20 @@ void HttpHandler::OnWebSocketMessage(HttpServerInterface* http_server,
     return;
   }
 
+  if (*method == "browser.setDownloadBehavior") {
+    base::DictValue params;
+    params.Set("bidiCommand", std::move(parsed));
+    params.Set("connectionId", connection_id);
+    ExecuteSessionCommand(
+        &session_thread_map_, "ForwardBidiBrowserSetDownloadBehavior",
+        base::BindRepeating(&ForwardBidiBrowserSetDownloadBehavior),
+        true, false, params, session_id,
+        base::BindRepeating(&HttpHandler::SendResponseOverWebSocket,
+                            weak_ptr_factory_.GetWeakPtr(), http_server,
+                            connection_id, std::move(maybe_id)));
+    return;
+  }
+
   cmd_it = session_bidi_command_map_.find(*method);
   if (cmd_it != session_bidi_command_map_.end()) {
     CommandCallback callback = base::BindRepeating(

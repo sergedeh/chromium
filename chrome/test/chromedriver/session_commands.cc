@@ -1881,3 +1881,30 @@ Status ForwardBidiCommand(Session* session,
 
   return status;
 }
+
+Status ForwardBidiBrowserSetDownloadBehavior(
+    Session* session,
+    const base::DictValue& params,
+    std::unique_ptr<base::Value>* value) {
+  const base::DictValue* data = params.FindDict("bidiCommand");
+  if (!data) {
+    return Status{kUnknownError, "bidiCommand is missing in params"};
+  }
+
+  base::DictValue bidi_cmd = data->Clone();
+  base::DictValue* download_behavior =
+      bidi_cmd.FindDictByDottedPath("params.downloadBehavior");
+  if (download_behavior && session->chrome &&
+      session->chrome->GetBrowserInfo()->is_android) {
+    std::string* destination_folder =
+        download_behavior->FindString("destinationFolder");
+    if (destination_folder) {
+      *destination_folder =
+          session->RegisterAndroidDownloadPath(*destination_folder);
+    }
+  }
+
+  base::DictValue forwarded_params = params.Clone();
+  forwarded_params.Set("bidiCommand", std::move(bidi_cmd));
+  return ForwardBidiCommand(session, forwarded_params, value);
+}

@@ -211,6 +211,11 @@ Status ForwardBidiCommand(Session* session,
                           const base::DictValue& params,
                           std::unique_ptr<base::Value>* value);
 
+Status ForwardBidiBrowserSetDownloadBehavior(
+    Session* session,
+    const base::DictValue& params,
+    std::unique_ptr<base::Value>* value);
+
 namespace internal {
 Status ConfigureHeadlessSession(Session* session,
                                 const Capabilities& capabilities);
